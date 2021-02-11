@@ -1404,6 +1404,17 @@ static int usbhid_probe(struct usb_interface *intf, const struct usb_device_id *
 	if (usb_string(dev, dev->descriptor.iSerialNumber, hid->uniq, 64) <= 0)
 		hid->uniq[0] = 0;
 
+	/*
+	 * ChamSys MQ250M - give the internal touchscreens unique names
+	 * so they can be easily mapped using xinput.
+	 */
+
+	if(!strcmp(hid->name, "ILITEK ILITEK-TP") && !strcmp(hid->phys, "usb-0000:00:15.0-2.2/input0"))
+		strlcpy(hid->name, "CHAMSYS_MQ250M_TOUCH_LEFT", sizeof(hid->name));
+
+	if(!strcmp(hid->name, "ILITEK ILITEK-TP") && !strcmp(hid->phys, "usb-0000:00:15.0-2.3/input0"))
+		strlcpy(hid->name, "CHAMSYS_MQ250M_TOUCH_RIGHT", sizeof(hid->name));
+
 	usbhid = kzalloc(sizeof(*usbhid), GFP_KERNEL);
 	if (usbhid == NULL) {
 		ret = -ENOMEM;
