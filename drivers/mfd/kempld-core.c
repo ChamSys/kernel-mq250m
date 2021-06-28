@@ -128,12 +128,20 @@ static struct platform_device *kempld_pdev;
 
 static int kempld_create_platform_device(const struct dmi_system_id *id)
 {
-	const struct kempld_platform_data *pdata = id->driver_data;
+	struct kempld_platform_data *pdata = id->driver_data;
 	int ret;
 
 	kempld_pdev = platform_device_alloc("kempld", -1);
 	if (!kempld_pdev)
 		return -ENOMEM;
+
+	/* For Apollo Lake-I platform, set LPC bus frequency to 25MHZ */
+	if (!strcmp(id->ident, "SXAL") || !strcmp(id->ident, "MAPL") || \
+	    !strcmp(id->ident, "PAPL") || !strcmp(id->ident, "KBOX") || \
+	    !strcmp(id->ident, "Q7AL"))
+	{
+		pdata->pld_clock = KEMPLD_CLK_25_MHZ;
+	}
 
 	ret = platform_device_add_data(kempld_pdev, pdata, sizeof(*pdata));
 	if (ret)
@@ -940,6 +948,51 @@ static const struct dmi_system_id kempld_dmi_table[] __initconst = {
 		.matches = {
 			DMI_MATCH(DMI_BOARD_VENDOR, "Kontron"),
 			DMI_MATCH(DMI_BOARD_NAME, "Qseven-Q7AL"),
+		},
+		.driver_data = (void *)&kempld_platform_data_generic,
+		.callback = kempld_create_platform_device,
+	},
+	{
+		.ident = "SXAL",
+		.matches = {
+			DMI_MATCH(DMI_BOARD_VENDOR, "Kontron"),
+			DMI_MATCH(DMI_BOARD_NAME, "SMARC-sXAL"),
+		},
+		.driver_data = (void *)&kempld_platform_data_generic,
+		.callback = kempld_create_platform_device,
+	},
+	{
+		.ident = "MAPL",
+		.matches = {
+			DMI_MATCH(DMI_BOARD_VENDOR, "Kontron"),
+			DMI_MATCH(DMI_BOARD_NAME, "mITX-APL"),
+		},
+		.driver_data = (void *)&kempld_platform_data_generic,
+		.callback = kempld_create_platform_device,
+	},
+	{
+		.ident = "PAPL",
+		.matches = {
+			DMI_MATCH(DMI_BOARD_VENDOR, "Kontron"),
+			DMI_MATCH(DMI_BOARD_NAME, "pITX-APL"),
+		},
+		.driver_data = (void *)&kempld_platform_data_generic,
+		.callback = kempld_create_platform_device,
+	},
+	{
+		.ident = "KBOX",
+		.matches = {
+			DMI_MATCH(DMI_BOARD_VENDOR, "Kontron"),
+			DMI_MATCH(DMI_BOARD_NAME, "KBox A-203"),
+		},
+		.driver_data = (void *)&kempld_platform_data_generic,
+		.callback = kempld_create_platform_device,
+	},
+	{
+		.ident = "Q7AL",
+		.matches = {
+			DMI_MATCH(DMI_BOARD_VENDOR, "Kontron"),
+			DMI_MATCH(DMI_BOARD_NAME, "Qseven-Q7ALi"),
 		},
 		.driver_data = (void *)&kempld_platform_data_generic,
 		.callback = kempld_create_platform_device,
