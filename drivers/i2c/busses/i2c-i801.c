@@ -1308,6 +1308,23 @@ static void register_dell_lis3lv02d_i2c_device(struct i801_priv *priv)
 	i2c_new_client_device(&priv->adapter, &info);
 }
 
+static int is_kontron_smarc(void)
+{
+	const char *vendor;
+
+	vendor = dmi_get_system_info(DMI_BOARD_VENDOR);
+	return vendor && (strstr(vendor, "Kontron") == vendor);
+}
+
+static int is_adlink_smarc(void)
+{
+	return !is_kontron_smarc();
+}
+
+static struct i2c_board_info adlink_gpio_smbus_info = {
+	I2C_BOARD_INFO("pca9535", 0x20),
+};
+
 /* Register optional slaves */
 static void i801_probe_optional_slaves(struct i801_priv *priv)
 {
@@ -1335,6 +1352,9 @@ static void i801_probe_optional_slaves(struct i801_priv *priv)
 	if (!priv->mux_drvdata)
 #endif
 		i2c_register_spd(&priv->adapter);
+	
+	if(is_adlink_smarc())
+		i2c_new_client_device(&priv->adapter, &adlink_gpio_smbus_info);
 }
 #else
 static void __init input_apanel_init(void) {}
@@ -1729,6 +1749,12 @@ static int i801_probe(struct pci_dev *dev, const struct pci_device_id *id)
 	unsigned char temp;
 	int err, i;
 	struct i801_priv *priv;
+	int is_kontron;
+
+	const char *vendor;
+
+	vendor = dmi_get_system_info(DMI_BOARD_VENDOR);
+	dev_info(&dev->dev, "Is Kontron SMARC: %s\n", vendor);
 
 	priv = devm_kzalloc(&dev->dev, sizeof(*priv), GFP_KERNEL);
 	if (!priv)
@@ -1742,6 +1768,9 @@ static int i801_probe(struct pci_dev *dev, const struct pci_device_id *id)
 	ACPI_COMPANION_SET(&priv->adapter.dev, ACPI_COMPANION(&dev->dev));
 	priv->adapter.retries = 3;
 	mutex_init(&priv->acpi_lock);
+
+	is_kontron = is_kontron_smarc();
+	dev_info(&dev->dev, "Is Kontron SMARC: %d\n", is_kontron);
 
 	priv->pci_dev = dev;
 	switch (dev->device) {
@@ -1780,6 +1809,15 @@ static int i801_probe(struct pci_dev *dev, const struct pci_device_id *id)
 		priv->features |= FEATURE_BLOCK_BUFFER;
 		priv->features |= FEATURE_TCO_CNL;
 		priv->features |= FEATURE_HOST_NOTIFY;
+		break;
+
+	case PCI_DEVICE_ID_INTEL_BROXTON_SMBUS:
+		if(is_kontron)
+		{
+			priv->features |= FEATURE_SMBUS_PEC;
+			priv->features |= FEATURE_I2C_BLOCK_READ;
+			priv->features |= FEATURE_BLOCK_BUFFER;
+		}
 		break;
 
 	case PCI_DEVICE_ID_INTEL_PATSBURG_SMBUS_IDF0:
