@@ -1058,6 +1058,26 @@ static int smsc95xx_bind(struct usbnet *dev, struct usb_interface *intf)
 
 	printk(KERN_INFO SMSC_CHIPNAME " v" SMSC_DRIVER_VERSION "\n");
 
+	/*
+	 * ChamSys Ltd
+	 * The LAN9500A USB ethernet chip on MQ250M programmer PCB is for
+	 * Stadium Connect only, and should be disabled by removing 0R link.
+	 * Just in case it was left enabled, don't load driver so users can
+	 * still use their own USB ethernet devices.
+	 */
+	{
+		char usb_phys[64];
+		memset(usb_phys, 0, sizeof(usb_phys));
+		usb_make_path(interface_to_usbdev(intf), usb_phys, sizeof(usb_phys));
+
+		if(!strcmp(usb_phys, "usb-0000:00:15.0-5.5"))
+		{
+			netdev_err(dev->net, "Not loading driver for LAN9500A chip on MQ250M programmer "
+			                    "board (this should have been hardware disabled)\n");
+			return -ENODEV;
+		}
+	}
+
 	ret = usbnet_get_endpoints(dev, intf);
 	if (ret < 0) {
 		netdev_warn(dev->net, "usbnet_get_endpoints failed: %d\n", ret);
