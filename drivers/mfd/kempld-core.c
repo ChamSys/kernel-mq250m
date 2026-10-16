@@ -127,6 +127,21 @@ static const struct kempld_platform_data kempld_platform_data_generic = {
 	.register_cells		= kempld_register_cells_generic,
 };
 
+/*
+ * ChamSys MQ250M: the Apollo Lake-I Kontron boards (SMARC-sXAL and friends)
+ * clock the PLD from 25 MHz, not the 33.33 MHz of the older platforms. The
+ * PLD clock scales the I2C prescaler and watchdog timeouts, so with the wrong
+ * value the I2C bus and watchdog run at the wrong speed/period.
+ */
+static const struct kempld_platform_data kempld_platform_data_apl = {
+	.pld_clock		= KEMPLD_CLK_25_MHZ,
+	.ioresource		= &kempld_ioresource,
+	.get_hardware_mutex	= kempld_get_hardware_mutex,
+	.release_hardware_mutex	= kempld_release_hardware_mutex,
+	.get_info		= kempld_get_info_generic,
+	.register_cells		= kempld_register_cells_generic,
+};
+
 static struct platform_device *kempld_pdev;
 
 static int kempld_create_platform_device(const struct kempld_platform_data *pdata)
@@ -655,6 +670,7 @@ static const struct dmi_system_id kempld_dmi_table[] __initconst = {
 			DMI_MATCH(DMI_BOARD_VENDOR, "Kontron"),
 			DMI_MATCH(DMI_BOARD_NAME, "KBox A-203"),
 		},
+		.driver_data = (void *)&kempld_platform_data_apl,
 	}, {
 		.ident = "M4A1",
 		.matches = {
@@ -673,6 +689,7 @@ static const struct dmi_system_id kempld_dmi_table[] __initconst = {
 			DMI_MATCH(DMI_BOARD_VENDOR, "Kontron"),
 			DMI_MATCH(DMI_BOARD_NAME, "mITX-APL"),
 		},
+		.driver_data = (void *)&kempld_platform_data_apl,
 	}, {
 		.ident = "MBR1",
 		.matches = {
@@ -715,12 +732,14 @@ static const struct dmi_system_id kempld_dmi_table[] __initconst = {
 			DMI_MATCH(DMI_BOARD_VENDOR, "Kontron"),
 			DMI_MATCH(DMI_BOARD_NAME, "pITX-APL"),
 		},
+		.driver_data = (void *)&kempld_platform_data_apl,
 	}, {
 		.ident = "SXAL",
 		.matches = {
 			DMI_MATCH(DMI_BOARD_VENDOR, "Kontron"),
 			DMI_MATCH(DMI_BOARD_NAME, "SMARC-sXAL"),
 		},
+		.driver_data = (void *)&kempld_platform_data_apl,
 	}, {
 		.ident = "SXAL4",
 		.matches = {
@@ -769,10 +788,17 @@ static const struct dmi_system_id kempld_dmi_table[] __initconst = {
 			DMI_MATCH(DMI_BOARD_VENDOR, "Kontron"),
 			DMI_MATCH(DMI_BOARD_NAME, "Qseven-Q7AL"),
 		},
+		.driver_data = (void *)&kempld_platform_data_apl,
 	},
 	{}
 };
 MODULE_DEVICE_TABLE(dmi, kempld_dmi_table);
+
+/* DMI entries without driver_data use the generic (33.33 MHz) platform data */
+static const struct kempld_platform_data *kempld_dmi_pdata(const struct dmi_system_id *id)
+{
+	return id->driver_data ? id->driver_data : &kempld_platform_data_generic;
+}
 
 static int __init kempld_init(void)
 {
@@ -788,13 +814,13 @@ static int __init kempld_init(void)
 	if (force_device_id[0]) {
 		for (id = kempld_dmi_table; id->matches[0].slot != DMI_NONE; id++)
 			if (strstr(id->ident, force_device_id))
-				if (!kempld_create_platform_device(&kempld_platform_data_generic))
+				if (!kempld_create_platform_device(kempld_dmi_pdata(id)))
 					break;
 		if (id->matches[0].slot == DMI_NONE)
 			return -ENODEV;
 	} else {
 		for (id = dmi_first_match(kempld_dmi_table); id; id = dmi_first_match(id+1))
-			if (kempld_create_platform_device(&kempld_platform_data_generic))
+			if (kempld_create_platform_device(kempld_dmi_pdata(id)))
 				break;
 	}
 	return platform_driver_register(&kempld_driver);
