@@ -1164,6 +1164,25 @@ static void dmi_check_onboard_devices(const struct dmi_header *dm, void *adap)
 	}
 }
 
+/*
+ * ChamSys MQ250M: the console uses either a Kontron SMARC-sXAL or an Adlink
+ * LEC-AL SMARC module, both Apollo Lake and so both with a Broxton SMBus.
+ */
+static bool is_kontron_smarc(void)
+{
+	const char *vendor = dmi_get_system_info(DMI_BOARD_VENDOR);
+
+	return vendor && str_has_prefix(vendor, "Kontron");
+}
+
+/*
+ * Only the Adlink module has a PCA9535 GPIO expander on its SMBus, at 0x20.
+ * It is not described by ACPI, so instantiate it by hand.
+ */
+static const struct i2c_board_info adlink_gpio_smbus_info = {
+	I2C_BOARD_INFO("pca9535", 0x20),
+};
+
 /* Register optional targets */
 static void i801_probe_optional_targets(struct i801_priv *priv)
 {
@@ -1188,6 +1207,10 @@ static void i801_probe_optional_targets(struct i801_priv *priv)
 	if (!priv->mux_pdev)
 #endif
 		i2c_register_spd_write_enable(&priv->adapter);
+
+	if (priv->pci_dev->device == PCI_DEVICE_ID_INTEL_BROXTON_SMBUS &&
+	    !is_kontron_smarc())
+		i2c_new_client_device(&priv->adapter, &adlink_gpio_smbus_info);
 }
 #else
 static void __init input_apanel_init(void) {}
