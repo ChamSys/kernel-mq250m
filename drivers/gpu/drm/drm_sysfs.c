@@ -24,6 +24,7 @@
 
 #include <drm/drm_accel.h>
 #include <drm/drm_connector.h>
+#include <drm/drm_crtc.h>
 #include <drm/drm_device.h>
 #include <drm/drm_file.h>
 #include <drm/drm_modes.h>
@@ -294,6 +295,36 @@ static ssize_t modes_show(struct device *device,
 	return written;
 }
 
+/*
+ * ChamSys Ltd: currently active mode of the connector as WxHp<refresh> (e.g.
+ * 1920x1080p60). MagicQ's monitor scripts read this to find out what the
+ * console's outputs are actually running.
+ */
+static ssize_t mode_show(struct device *device,
+			 struct device_attribute *attr,
+			 char *buf)
+{
+	struct drm_connector *connector = to_drm_connector(device);
+	struct drm_crtc_state *crtc_state;
+	struct drm_display_mode *mode;
+	bool interlaced;
+
+	if (!connector->state || !connector->state->crtc)
+		return 0;
+
+	crtc_state = connector->state->crtc->state;
+	if (!crtc_state)
+		return 0;
+
+	mode = &crtc_state->mode;
+	interlaced = !!(mode->flags & DRM_MODE_FLAG_INTERLACE);
+
+	return sysfs_emit(buf, "%dx%d%s%d\n",
+			  mode->hdisplay, mode->vdisplay,
+			  interlaced ? "i" : "p",
+			  drm_mode_vrefresh(mode));
+}
+
 static ssize_t connector_id_show(struct device *device,
 				 struct device_attribute *attr,
 				 char *buf)
@@ -307,6 +338,7 @@ static DEVICE_ATTR_RW(status);
 static DEVICE_ATTR_RO(enabled);
 static DEVICE_ATTR_RO(dpms);
 static DEVICE_ATTR_RO(modes);
+static DEVICE_ATTR_RO(mode);
 static DEVICE_ATTR_RO(connector_id);
 
 static struct attribute *connector_dev_attrs[] = {
@@ -314,6 +346,7 @@ static struct attribute *connector_dev_attrs[] = {
 	&dev_attr_enabled.attr,
 	&dev_attr_dpms.attr,
 	&dev_attr_modes.attr,
+	&dev_attr_mode.attr,
 	&dev_attr_connector_id.attr,
 	NULL
 };
